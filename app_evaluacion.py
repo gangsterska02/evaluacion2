@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import random
 import io
+import re
 
 # ─────────────────────────────────────────────
 # PALETA DE COLORES
@@ -490,18 +491,22 @@ def ir_a(pagina: str):
     st.session_state.pagina = pagina
 
 
+def _limpiar_prefijo(texto: str) -> str:
+    """Elimina prefijos tipo a), A), 1), 1. que algunas opciones ya traen."""
+    return re.sub(r"^\s*([0-9]+[.)]\s*|[a-dA-D][.)]\s*)", "", texto).strip()
+
+
 def preparar_preguntas():
-    """Baraja opciones de cada pregunta y luego baraja el orden de preguntas."""
+    """Limpia prefijos, baraja opciones y baraja el orden de preguntas."""
     preguntas = []
     for q in PREGUNTAS_BASE:
         item = dict(q)
-        opciones = list(item["opciones"])
-        correct_text = item["correcta_text"]
-        random.shuffle(opciones)
-        correct_index = opciones.index(correct_text) + 1
-        item["opciones"] = opciones
-        item["correcta"] = str(correct_index)
-        item["correcta_text"] = correct_text
+        opciones_limpias = [_limpiar_prefijo(o) for o in item["opciones"]]
+        correct_clean    = _limpiar_prefijo(item["correcta_text"])
+        random.shuffle(opciones_limpias)
+        item["opciones"]      = opciones_limpias
+        item["correcta_text"] = correct_clean
+        item["correcta_idx"]  = opciones_limpias.index(correct_clean)
         preguntas.append(item)
     random.shuffle(preguntas)
     return preguntas
@@ -702,8 +707,9 @@ def vista_preguntas():
                 "dentro de la carpeta `images/` en la raíz de tu repositorio de GitHub."
             )
 
-    # Opciones de respuesta
-    opciones_display = [f"{i+1}) {opt}" for i, opt in enumerate(q["opciones"])]
+    # Opciones: numeración limpia 1) 2) 3) 4) — sin doble prefijo
+    numeros = ["1)", "2)", "3)", "4)", "5)"]
+    opciones_display = [f"{numeros[i]} {opt}" for i, opt in enumerate(q["opciones"])]
     seleccion = st.radio(
         "Selecciona una opción:",
         options=opciones_display,
@@ -715,10 +721,9 @@ def vista_preguntas():
         if seleccion is None:
             st.warning("Por favor selecciona una opción antes de continuar.")
         else:
-            # Índice seleccionado (base-1)
-            sel_idx = opciones_display.index(seleccion) + 1
-            respuesta_texto = q["opciones"][sel_idx - 1]
-            es_correcta = sel_idx == int(q["correcta"])
+            sel_idx = opciones_display.index(seleccion)        # base-0
+            respuesta_texto = q["opciones"][sel_idx]
+            es_correcta     = sel_idx == q["correcta_idx"]    # comparación base-0 directa
 
             st.session_state.answers.append({
                 "Pregunta":                q["pregunta"],
