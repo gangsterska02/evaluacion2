@@ -8,6 +8,7 @@ import pandas as pd
 import random
 import io
 import re
+from pathlib import Path
 
 # ─────────────────────────────────────────────
 # PALETA DE COLORES
@@ -80,6 +81,7 @@ PREGUNTAS_BASE = [
             "La intensidad del estímulo aversivo explica por sí sola la variación en la respuesta.",
         ],
         "correcta_text": "La similitud entre los estímulos determina la generalización de la respuesta, produciendo un gradiente decreciente.",
+        "imagen_path": "images/gradiente_generalizacion.png",
         "categoria": "Análisis conceptual de fenómenos psicológicos",
     },
     {
@@ -156,6 +158,7 @@ PREGUNTAS_BASE = [
             "La variabilidad conductual es mayor únicamente cuando la magnitud del reforzamiento es alta.",
         ],
         "correcta_text": "La disminución de la magnitud del reforzamiento se asocia con un incremento en la variabilidad conductual.",
+        "imagen_path": "images/grafica_latencia.png",
         "categoria": "Análisis metodológico de hechos psicológicos",
     },
     {
@@ -682,29 +685,52 @@ def vista_preguntas():
     progreso = idx / total
     st.progress(progreso, text=f"Pregunta {idx + 1} de {total}")
 
-    # Tarjeta de pregunta
+    # ── Categoría ──────────────────────────────────────────────────────────
     categoria = q.get("categoria", "")
-    st.markdown(f"""
-    <div class="card">
-        <p style="font-size:0.85rem; color:{FG_TITULO}; font-style:italic; margin-bottom:0.5rem;">
-            📂 {categoria}
-        </p>
-        <p style="font-size:1.05rem; color:{FG_TEXTO}; font-weight:600;">
-            {q['pregunta']}
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f"<p style='color:{FG_TITULO}; font-style:italic; font-size:0.88rem; margin:0 0 4px 0;'>"
+        f"📂 {categoria}</p>",
+        unsafe_allow_html=True,
+    )
 
-    # Imagen si existe
+    # ── Enunciado: dividido en párrafos, NUNCA truncado por HTML ───────────
+    # Se busca el punto justo antes de la pregunta directa para separar en 2 párrafos.
+    texto = q["pregunta"]
+    # Patrones que suelen marcar el inicio de la pregunta directa
+    separadores = [
+        "¿Cuál", "¿Qué", "¿Cuá", "Con base en", "Selecciona", "Elige",
+        "De acuerdo", "Determina", "Dado este", "Considerando",
+    ]
+    parrafos = [texto]
+    for sep in separadores:
+        idx_sep = texto.find(sep)
+        if idx_sep > 80:   # sólo separar si el contexto previo es sustancial
+            parrafos = [texto[:idx_sep].strip(), texto[idx_sep:].strip()]
+            break
+
+    # Renderizar cada párrafo como bloque independiente dentro de una tarjeta
+    parrafos_html = "".join(
+        f"<p style='color:{FG_TEXTO}; font-size:1.02rem; font-weight:600; "
+        f"margin:0 0 0.7rem 0; line-height:1.55;'>{p}</p>"
+        for p in parrafos if p
+    )
+    st.markdown(
+        f"<div style='background:{BG_ACENTO}; border-radius:12px; "
+        f"padding:1.2rem 1.4rem; border:1px solid #c5d8ef; margin-bottom:0.8rem;'>"
+        f"{parrafos_html}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Imagen (ruta absoluta via pathlib, funciona en Streamlit Cloud) ────
     if "imagen_path" in q:
-        img_path = q["imagen_path"]
-        try:
-            st.image(img_path, use_container_width=True)
-        except Exception:
+        nombre_img = q["imagen_path"].replace("images/", "").replace("images\\", "")
+        ruta_abs   = Path(__file__).parent / "images" / nombre_img
+        if ruta_abs.exists():
+            st.image(str(ruta_abs), use_container_width=True)
+        else:
             st.warning(
-                f"⚠️ Imagen no encontrada: `{img_path}`\n\n"
-                "Para que las imágenes aparezcan en Streamlit Cloud, asegúrate de que estén "
-                "dentro de la carpeta `images/` en la raíz de tu repositorio de GitHub."
+                f"Imagen **{nombre_img}** no encontrada. "
+                "Asegúrate de que esté en la carpeta `images/` de tu repositorio."
             )
 
     # Opciones: numeración limpia 1) 2) 3) 4) — sin doble prefijo
